@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onUnmounted } from "vue";
+import chroma from "chroma-js";
+import { onUnmounted, ref } from "vue";
 
 let isGameStarted = ref(false);
 let isGameOver = ref(false);
@@ -16,40 +17,49 @@ let totalGameTime = ref(0);
 let gameModeName = ref("");
 
 let generateColorPair = (score) => {
-  let baseR = Math.floor(Math.random() * 256);
-  let baseG = Math.floor(Math.random() * 256);
-  let baseB = Math.floor(Math.random() * 256);
-  let diff =
-    Math.max(Math.floor(Math.exp(-score / 10) * 128), 1) *
-    (Math.random() < 0.5 ? 1 : -1);
-  let channelToChange = Math.floor(Math.random() * 3);
-  let secondR = baseR;
-  let secondG = baseG;
-  let secondB = baseB;
+  let targetDeltaE = Math.max(Math.exp(-score / 10) * 20, 0.1);
+  let color1, color2;
+  let deltaE = 0;
 
-  if (channelToChange === 0) {
-    if (baseR + diff < 0 || baseR + diff > 255) {
-      diff = -diff;
-    }
-
-    secondR = baseR + diff;
-  } else if (channelToChange === 1) {
-    if (baseG + diff < 0 || baseG + diff > 255) {
-      diff = -diff;
-    }
-
-    secondG = baseG + diff;
-  } else {
-    if (baseB + diff < 0 || baseB + diff > 255) {
-      diff = -diff;
-    }
-
-    secondB = baseB + diff;
+  while (deltaE <= 20) {
+    color1 = chroma.random();
+    color2 = chroma.random();
+    deltaE = chroma.deltaE(color1, color2);
   }
 
+  let colorScale = chroma.scale([color1, color2]);
+  let low = 0;
+  let high = 1;
+  let mid, midColor, currentDeltaE;
+  let bestMid = 0.5;
+  let bestDiff = Infinity;
+
+  for (let i = 0; i < 100; i++) {
+    mid = (low + high) / 2;
+    midColor = colorScale(mid);
+    currentDeltaE = chroma.deltaE(color1, midColor);
+    let diff = Math.abs(currentDeltaE - targetDeltaE);
+
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestMid = mid;
+    }
+
+    if (bestDiff < 0.1) {
+      break;
+    }
+
+    if (currentDeltaE > targetDeltaE) {
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+
+  let diffColor = colorScale(bestMid);
   return {
-    mainColor: `rgb(${baseR}, ${baseG}, ${baseB})`,
-    diffColor: `rgb(${secondR}, ${secondG}, ${secondB})`,
+    mainColor: color1.css(),
+    diffColor: diffColor.css(),
   };
 };
 
